@@ -43,12 +43,15 @@ const SHAPES = [
 
 const COLORS = ["cyan","yellow","purple","blue","orange","green","red"];
 
+// ===== FIX SPAWN CENTER =====
 function newPiece() {
   let i = Math.floor(Math.random() * SHAPES.length);
+  let shape = SHAPES[i];
+
   return {
-    shape: SHAPES[i],
+    shape: shape,
     color: COLORS[i],
-    x: 3,
+    x: Math.floor((COLS - shape[0].length) / 2),
     y: 0
   };
 }
@@ -108,7 +111,7 @@ function drawMini(ctx, p) {
   });
 }
 
-// ===== COLLISION (FIX UTAMA) =====
+// ===== COLLISION FIX =====
 function collide(p = piece) {
   for (let y = 0; y < p.shape.length; y++) {
     for (let x = 0; x < p.shape[y].length; x++) {
@@ -171,7 +174,7 @@ function spawn() {
   if (collide()) gameRunning = false;
 }
 
-// ===== MOVEMENT (FIXED) =====
+// ===== MOVEMENT =====
 function move(dx) {
   piece.x += dx;
   if (collide()) piece.x -= dx;
@@ -211,7 +214,7 @@ function hold() {
     spawn();
   } else {
     [piece, holdPiece] = [holdPiece, piece];
-    piece.x = 3;
+    piece.x = Math.floor((COLS - piece.shape[0].length) / 2);
     piece.y = 0;
   }
 
@@ -242,7 +245,7 @@ document.addEventListener("keyup", e => {
   }
 });
 
-// ===== SMOOTH MOVEMENT =====
+// ===== SMOOTH =====
 function handleMovement(delta) {
   if (moveLeft || moveRight) {
     das += delta;
