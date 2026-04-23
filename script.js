@@ -103,25 +103,34 @@ function drawMini(ctx, p) {
 
   p.shape.forEach((row, y) => {
     row.forEach((val, x) => {
-      if (val) drawCell(ctx, x+1, y+1, p.color, 20);
+      if (val) drawCell(ctx, x + 1, y + 1, p.color, 20);
     });
   });
 }
 
-// ===== LOGIC =====
+// ===== COLLISION (FIX UTAMA) =====
 function collide(p = piece) {
-  return p.shape.some((row, y) =>
-    row.some((val, x) => {
-      let px = p.x + x;
-      let py = p.y + y;
-      return (
-        val &&
-        (px < 0 || px >= COLS || py >= ROWS || (board[py] && board[py][px]))
-      );
-    })
-  );
+  for (let y = 0; y < p.shape.length; y++) {
+    for (let x = 0; x < p.shape[y].length; x++) {
+      if (p.shape[y][x]) {
+        let px = p.x + x;
+        let py = p.y + y;
+
+        if (
+          px < 0 ||
+          px >= COLS ||
+          py >= ROWS ||
+          (py >= 0 && board[py][px])
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
+// ===== LOGIC =====
 function merge() {
   piece.shape.forEach((row, y) => {
     row.forEach((val, x) => {
@@ -162,19 +171,10 @@ function spawn() {
   if (collide()) gameRunning = false;
 }
 
-// ===== MOVEMENT FIX (MENTOK PERFECT) =====
+// ===== MOVEMENT (FIXED) =====
 function move(dx) {
   piece.x += dx;
-
-  if (collide()) {
-    piece.x -= dx;
-
-    // dorong sampai benar-benar mentok
-    while (!collide()) {
-      piece.x += dx;
-    }
-    piece.x -= dx;
-  }
+  if (collide()) piece.x -= dx;
 }
 
 function rotate() {
@@ -242,7 +242,7 @@ document.addEventListener("keyup", e => {
   }
 });
 
-// ===== SMOOTH SYSTEM =====
+// ===== SMOOTH MOVEMENT =====
 function handleMovement(delta) {
   if (moveLeft || moveRight) {
     das += delta;
@@ -255,6 +255,7 @@ function handleMovement(delta) {
   }
 }
 
+// ===== GRAVITY =====
 function update(delta) {
   dropCounter += delta;
 
