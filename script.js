@@ -13,7 +13,22 @@ const SIZE = 20;
 
 let board, piece, nextPiece, holdPiece;
 let score, level, lines;
-let game, gameRunning, canHold;
+let gameRunning, canHold;
+
+// smooth system
+let lastTime = 0;
+let dropCounter = 0;
+let dropInterval = 700;
+
+let moveLeft = false;
+let moveRight = false;
+
+let das = 0;
+let dasDelay = 120;
+let arr = 40;
+
+let lockDelay = 400;
+let lockTimer = 0;
 
 // shapes
 const SHAPES = [
@@ -51,7 +66,6 @@ function init() {
   holdPiece = null;
 
   updateUI();
-  document.getElementById("restartBtn").style.display = "none";
 }
 
 function updateUI() {
@@ -59,6 +73,7 @@ function updateUI() {
   document.getElementById("level").textContent = level;
 }
 
+// ===== DRAW =====
 function drawCell(ctx, x, y, color, size) {
   ctx.fillStyle = color;
   ctx.fillRect(x * size, y * size, size, size);
@@ -93,6 +108,7 @@ function drawMini(ctx, p) {
   });
 }
 
+// ===== LOGIC =====
 function collide(p = piece) {
   return p.shape.some((row, y) =>
     row.some((val, x) => {
@@ -133,15 +149,9 @@ function clearLines() {
     lines += cleared;
     score += cleared * 10;
     level = 1 + Math.floor(lines / 5);
-    updateSpeed();
+    dropInterval = Math.max(100, 700 - (level - 1) * 50);
     updateUI();
   }
-}
-
-function updateSpeed() {
-  clearInterval(game);
-  let speed = Math.max(100, 500 - (level - 1) * 50);
-  game = setInterval(loop, speed);
 }
 
 function spawn() {
@@ -149,7 +159,22 @@ function spawn() {
   nextPiece = newPiece();
   canHold = true;
 
-  if (collide()) gameOver();
+  if (collide()) gameRunning = false;
+}
+
+// ===== MOVEMENT FIX (MENTOK PERFECT) =====
+function move(dx) {
+  piece.x += dx;
+
+  if (collide()) {
+    piece.x -= dx;
+
+    // dorong sampai benar-benar mentok
+    while (!collide()) {
+      piece.x += dx;
+    }
+    piece.x -= dx;
+  }
 }
 
 function rotate() {
@@ -160,11 +185,6 @@ function rotate() {
   let old = piece.shape;
   piece.shape = rotated;
   if (collide()) piece.shape = old;
-}
-
-function move(dx) {
-  piece.x += dx;
-  if (collide()) piece.x -= dx;
 }
 
 function drop() {
@@ -198,36 +218,84 @@ function hold() {
   canHold = false;
 }
 
+// ===== INPUT =====
 document.addEventListener("keydown", e => {
   if (!gameRunning) return;
 
-  if (e.key === "ArrowLeft") move(-1);
-  if (e.key === "ArrowRight") move(1);
+  if (e.key === "ArrowLeft") moveLeft = true;
+  if (e.key === "ArrowRight") moveRight = true;
+
   if (e.key === "ArrowDown") drop();
   if (e.key === "ArrowUp") rotate();
   if (e.code === "Space") hardDrop();
   if (e.key.toLowerCase() === "c") hold();
 });
 
-function loop() {
-  drop();
+document.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft") {
+    moveLeft = false;
+    das = 0;
+  }
+  if (e.key === "ArrowRight") {
+    moveRight = false;
+    das = 0;
+  }
+});
+
+// ===== SMOOTH SYSTEM =====
+function handleMovement(delta) {
+  if (moveLeft || moveRight) {
+    das += delta;
+
+    if (das > dasDelay) {
+      if (moveLeft) move(-1);
+      if (moveRight) move(1);
+      das = dasDelay - arr;
+    }
+  }
+}
+
+function update(delta) {
+  dropCounter += delta;
+
+  if (dropCounter > dropInterval) {
+    piece.y++;
+
+    if (collide()) {
+      piece.y--;
+      lockTimer += delta;
+
+      if (lockTimer > lockDelay) {
+        merge();
+        clearLines();
+        spawn();
+        lockTimer = 0;
+      }
+    } else {
+      lockTimer = 0;
+    }
+
+    dropCounter = 0;
+  }
+}
+
+// ===== LOOP =====
+function gameLoop(time = 0) {
+  const delta = time - lastTime;
+  lastTime = time;
+
+  if (!gameRunning) return;
+
+  handleMovement(delta);
+  update(delta);
+
   drawBoard();
   drawMini(nextCtx, nextPiece);
   drawMini(holdCtx, holdPiece);
-}
 
-function gameOver() {
-  gameRunning = false;
-  clearInterval(game);
-  document.getElementById("restartBtn").style.display = "inline-block";
-}
-
-function restartGame() {
-  clearInterval(game);
-  init();
-  updateSpeed();
+  requestAnimationFrame(gameLoop);
 }
 
 // start
 init();
-updateSpeed();
+requestAnimationFrame(gameLoop);
