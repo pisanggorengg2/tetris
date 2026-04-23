@@ -1,55 +1,69 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+const nextCanvas = document.getElementById("next");
+const nextCtx = nextCanvas.getContext("2d");
+
+const holdCanvas = document.getElementById("hold");
+const holdCtx = holdCanvas.getContext("2d");
+
 const COLS = 10;
 const ROWS = 20;
 const SIZE = 20;
 
-let board;
-let piece;
-let score;
-let game;
-let gameRunning = true;
+let board, piece, nextPiece, holdPiece;
+let score, level, lines;
+let game, gameRunning, canHold;
 
-// bentuk tetromino
+// shapes
 const SHAPES = [
-  [[1,1,1,1]],                // I
-  [[1,1],[1,1]],              // O
-  [[0,1,0],[1,1,1]],          // T
-  [[1,0,0],[1,1,1]],          // J
-  [[0,0,1],[1,1,1]],          // L
-  [[1,1,0],[0,1,1]],          // S
-  [[0,1,1],[1,1,0]]           // Z
+  [[1,1,1,1]],
+  [[1,1],[1,1]],
+  [[0,1,0],[1,1,1]],
+  [[1,0,0],[1,1,1]],
+  [[0,0,1],[1,1,1]],
+  [[1,1,0],[0,1,1]],
+  [[0,1,1],[1,1,0]]
 ];
 
 const COLORS = ["cyan","yellow","purple","blue","orange","green","red"];
 
-function init() {
-  board = Array.from({length: ROWS}, () => Array(COLS).fill(0));
-  score = 0;
-  gameRunning = true;
-  document.getElementById("score").textContent = score;
-  document.getElementById("restartBtn").style.display = "none";
-  spawn();
-}
-
-function spawn() {
+function newPiece() {
   let i = Math.floor(Math.random() * SHAPES.length);
-  piece = {
+  return {
     shape: SHAPES[i],
     color: COLORS[i],
     x: 3,
     y: 0
   };
-
-  if (collide()) gameOver();
 }
 
-function drawCell(x, y, color) {
+function init() {
+  board = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+  score = 0;
+  level = 1;
+  lines = 0;
+  gameRunning = true;
+  canHold = true;
+
+  piece = newPiece();
+  nextPiece = newPiece();
+  holdPiece = null;
+
+  updateUI();
+  document.getElementById("restartBtn").style.display = "none";
+}
+
+function updateUI() {
+  document.getElementById("score").textContent = score;
+  document.getElementById("level").textContent = level;
+}
+
+function drawCell(ctx, x, y, color, size) {
   ctx.fillStyle = color;
-  ctx.fillRect(x * SIZE, y * SIZE, SIZE, SIZE);
+  ctx.fillRect(x * size, y * size, size, size);
   ctx.strokeStyle = "#111";
-  ctx.strokeRect(x * SIZE, y * SIZE, SIZE, SIZE);
+  ctx.strokeRect(x * size, y * size, size, size);
 }
 
 function drawBoard() {
@@ -57,22 +71,33 @@ function drawBoard() {
 
   board.forEach((row, y) => {
     row.forEach((cell, x) => {
-      if (cell) drawCell(x, y, cell);
+      if (cell) drawCell(ctx, x, y, cell, SIZE);
     });
   });
 
   piece.shape.forEach((row, y) => {
     row.forEach((val, x) => {
-      if (val) drawCell(piece.x + x, piece.y + y, piece.color);
+      if (val) drawCell(ctx, piece.x + x, piece.y + y, piece.color, SIZE);
     });
   });
 }
 
-function collide() {
-  return piece.shape.some((row, y) =>
+function drawMini(ctx, p) {
+  ctx.clearRect(0, 0, 100, 100);
+  if (!p) return;
+
+  p.shape.forEach((row, y) => {
+    row.forEach((val, x) => {
+      if (val) drawCell(ctx, x+1, y+1, p.color, 20);
+    });
+  });
+}
+
+function collide(p = piece) {
+  return p.shape.some((row, y) =>
     row.some((val, x) => {
-      let px = piece.x + x;
-      let py = piece.y + y;
+      let px = p.x + x;
+      let py = p.y + y;
       return (
         val &&
         (px < 0 || px >= COLS || py >= ROWS || (board[py] && board[py][px]))
@@ -90,10 +115,11 @@ function merge() {
 }
 
 function clearLines() {
-  let lines = 0;
+  let cleared = 0;
+
   board = board.filter(row => {
     if (row.every(cell => cell)) {
-      lines++;
+      cleared++;
       return false;
     }
     return true;
@@ -103,8 +129,27 @@ function clearLines() {
     board.unshift(Array(COLS).fill(0));
   }
 
-  score += lines * 10;
-  document.getElementById("score").textContent = score;
+  if (cleared > 0) {
+    lines += cleared;
+    score += cleared * 10;
+    level = 1 + Math.floor(lines / 5);
+    updateSpeed();
+    updateUI();
+  }
+}
+
+function updateSpeed() {
+  clearInterval(game);
+  let speed = Math.max(100, 500 - (level - 1) * 50);
+  game = setInterval(loop, speed);
+}
+
+function spawn() {
+  piece = nextPiece;
+  nextPiece = newPiece();
+  canHold = true;
+
+  if (collide()) gameOver();
 }
 
 function rotate() {
@@ -138,6 +183,21 @@ function hardDrop() {
   drop();
 }
 
+function hold() {
+  if (!canHold) return;
+
+  if (!holdPiece) {
+    holdPiece = {...piece};
+    spawn();
+  } else {
+    [piece, holdPiece] = [holdPiece, piece];
+    piece.x = 3;
+    piece.y = 0;
+  }
+
+  canHold = false;
+}
+
 document.addEventListener("keydown", e => {
   if (!gameRunning) return;
 
@@ -146,11 +206,14 @@ document.addEventListener("keydown", e => {
   if (e.key === "ArrowDown") drop();
   if (e.key === "ArrowUp") rotate();
   if (e.code === "Space") hardDrop();
+  if (e.key.toLowerCase() === "c") hold();
 });
 
 function loop() {
   drop();
   drawBoard();
+  drawMini(nextCtx, nextPiece);
+  drawMini(holdCtx, holdPiece);
 }
 
 function gameOver() {
@@ -162,9 +225,9 @@ function gameOver() {
 function restartGame() {
   clearInterval(game);
   init();
-  game = setInterval(loop, 500);
+  updateSpeed();
 }
 
 // start
 init();
-game = setInterval(loop, 500);
+updateSpeed();
