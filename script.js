@@ -43,7 +43,7 @@ const SHAPES = [
 
 const COLORS = ["cyan","yellow","purple","blue","orange","green","red"];
 
-// ===== FIX SPAWN CENTER =====
+// ===== SPAWN CENTER =====
 function newPiece() {
   let i = Math.floor(Math.random() * SHAPES.length);
   let shape = SHAPES[i];
@@ -67,6 +67,8 @@ function init() {
   piece = newPiece();
   nextPiece = newPiece();
   holdPiece = null;
+
+  document.getElementById("restartBtn").style.display = "none";
 
   updateUI();
 }
@@ -111,7 +113,7 @@ function drawMini(ctx, p) {
   });
 }
 
-// ===== COLLISION FIX =====
+// ===== COLLISION =====
 function collide(p = piece) {
   for (let y = 0; y < p.shape.length; y++) {
     for (let x = 0; x < p.shape[y].length; x++) {
@@ -171,7 +173,15 @@ function spawn() {
   nextPiece = newPiece();
   canHold = true;
 
-  if (collide()) gameRunning = false;
+  if (collide()) gameOver();
+}
+
+// ===== GAME OVER FIX =====
+function gameOver() {
+  gameRunning = false;
+
+  // tampilkan tombol restart
+  document.getElementById("restartBtn").style.display = "inline-block";
 }
 
 // ===== MOVEMENT =====
@@ -219,6 +229,13 @@ function hold() {
   }
 
   canHold = false;
+}
+
+// ===== RESTART =====
+function restartGame() {
+  init();
+  lastTime = 0;
+  requestAnimationFrame(gameLoop);
 }
 
 // ===== INPUT =====
